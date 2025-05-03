@@ -1,0 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  @apply h-full bg-gradient-to-b from-blue-100 via-white to-gray-100 font-sans;
+}
+#root {
+  @apply h-full;
+}
