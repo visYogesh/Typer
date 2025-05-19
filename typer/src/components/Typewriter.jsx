@@ -2,49 +2,48 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 const DEFAULT_TEXT = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum vestibulum.`
-const DURATIONS = [1, 2, 5, 10, 30] // minutes
+const DURATIONS = [1, 2, 5, 10, 30] // in minutes
 
 export default function Typewriter() {
   const { state } = useLocation()
   const text = state?.customText || DEFAULT_TEXT
 
-  // --- Configuration ---
+  // --- CONFIGURATION ---
   const [durationMin, setDurationMin] = useState(1)
   const TEST_DURATION = durationMin * 60
 
-  // --- Test State ---
+  // --- TEST STATES ---
   const [input, setInput] = useState('')
   const [timeLeft, setTimeLeft] = useState(TEST_DURATION)
   const [isRunning, setIsRunning] = useState(false)
   const [finished, setFinished] = useState(false)
 
-  // --- Metrics ---
+  // --- METRICS ---
   const [backspaces, setBackspaces] = useState(0)
   const [wrongCount, setWrongCount] = useState(0)
-  const [speedHistory, setSpeedHistory] = useState([])
+  const [speedHistory, setSpeedHistory] = useState([]) // array of instantaneous WPM
   const [highestSpeed, setHighestSpeed] = useState(0)
 
   const textareaRef = useRef()
 
   // Timer effect
   useEffect(() => {
-    if (!isRunning) return
-
-    if (timeLeft > 0) {
-      const timerId = setTimeout(() => {
+    if (isRunning && timeLeft > 0) {
+      const timer = setTimeout(() => {
         const elapsed = TEST_DURATION - timeLeft + 1
-        const wordsTyped = input.trim().split(/\s+/).filter(Boolean).length
+        // compute instantaneous WPM
+        const wordsTyped = input.trim().split(/\s+/).length
         const instWpm = Math.round((wordsTyped / elapsed) * 60)
         setSpeedHistory((h) => [...h, instWpm])
         setHighestSpeed((h) => Math.max(h, instWpm))
 
         setTimeLeft((t) => t - 1)
       }, 1000)
-      return () => clearTimeout(timerId)
-    } else {
+      return () => clearTimeout(timer)
+    } else if (timeLeft === 0) {
       endTest()
     }
-  }, [isRunning, timeLeft])
+  }, [isRunning, timeLeft, input])
 
   const startTest = () => {
     setInput('')
@@ -55,27 +54,29 @@ export default function Typewriter() {
     setWrongCount(0)
     setSpeedHistory([])
     setHighestSpeed(0)
-    setTimeout(() => textareaRef.current?.focus(), 50)
+    setTimeout(() => textareaRef.current.focus(), 50)
   }
 
   const endTest = () => {
     setIsRunning(false)
     setFinished(true)
-    textareaRef.current?.blur()
+    textareaRef.current.blur()
   }
 
   const handleChange = (e) => {
     if (!isRunning) startTest()
     if (finished) return
 
-    const newVal = e.target.value
-    const idx = newVal.length - 1
-    if (idx >= 0 && newVal[idx] !== text[idx]) {
+    const newValue = e.target.value
+    // count wrong chars added
+    const addedCharIdx = newValue.length - 1
+    if (addedCharIdx >= 0 && newValue[addedCharIdx] !== text[addedCharIdx]) {
       setWrongCount((w) => w + 1)
     }
-    setInput(newVal)
+    setInput(newValue)
 
-    if (newVal.length >= text.length) {
+    // auto-end if full text typed
+    if (newValue.length >= text.length) {
       endTest()
     }
   }
@@ -86,13 +87,9 @@ export default function Typewriter() {
     }
   }
 
-  // Final metrics
+  // final metrics
   const correctChars = [...input].filter((ch, i) => ch === text[i]).length
-  const totalErrors = wrongCount + backspaces
-  const accuracy =
-    correctChars + totalErrors > 0
-      ? (correctChars / (correctChars + totalErrors)) * 100
-      : 100
+  const accuracy = input.length ? (correctChars / input.length) * 100 : 0
   const totalWords = input.trim().split(/\s+/).filter(Boolean).length
   const wpm = Math.round((totalWords / TEST_DURATION) * (TEST_DURATION - timeLeft))
 
@@ -104,13 +101,11 @@ export default function Typewriter() {
           <label className="font-medium">Duration:</label>
           <select
             value={durationMin}
-            onChange={(e) => setDurationMin(+e.target.value)}
-            className="p-2 border rounded focus:ring-2 focus:ring-blue-400"
+            onChange={(e) => setDurationMin(Number(e.target.value))}
+            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
           >
             {DURATIONS.map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
+              <option key={m} value={m}>{m} min</option>
             ))}
           </select>
           <button
@@ -124,17 +119,13 @@ export default function Typewriter() {
 
       {/* Text Display */}
       {(isRunning || finished) && (
-        <div className="p-6 bg-white rounded shadow h-48 overflow-auto font-mono text-lg leading-relaxed">
-          {text.split('').map((char, i) => {
-            let cls = 'opacity-50'
-            if (i < input.length) {
-              cls = char === input[i] ? 'text-green-500' : 'text-red-500'
+        <div className="p-6 bg-white rounded-lg shadow-md h-48 overflow-auto font-mono text-lg leading-relaxed">
+          {text.split('').map((char, idx) => {
+            let style = 'opacity-50'
+            if (idx < input.length) {
+              style = char === input[idx] ? 'text-green-500' : 'text-red-500'
             }
-            return (
-              <span key={i} className={cls}>
-                {char}
-              </span>
-            )
+            return <span key={idx} className={style}>{char}</span>
           })}
         </div>
       )}
@@ -147,38 +138,41 @@ export default function Typewriter() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={finished}
-          className="w-full h-36 p-4 border rounded focus:ring-2 focus:ring-blue-400 font-mono text-lg resize-none"
+          className="w-full h-36 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono text-lg resize-none"
           placeholder="Start typing here…"
         />
       )}
 
       {/* Footer Stats */}
       {(isRunning || finished) && (
-        <div className="flex flex-wrap justify-between items-center text-sm space-y-2">
+        <div className="flex justify-between items-center text-sm">
           <div>
-            <strong>Time Left:</strong>{' '}
+            <span className="font-medium">Time Left:</span>{' '}
             <span className="text-blue-600">{timeLeft}s</span>
           </div>
           <div className="space-x-4">
             <span>
-              <strong>Accuracy:</strong>{' '}
+              <span className="font-medium">Accuracy:</span>{' '}
               <span className="text-green-600">{accuracy.toFixed(2)}%</span>
             </span>
             <span>
-              <strong>WPM:</strong>{' '}
+              <span className="font-medium">WPM:</span>{' '}
               <span className="text-blue-600">{wpm}</span>
             </span>
             <span>
-              <strong>Backspaces:</strong> {backspaces}
+              <span className="font-medium">Backspaces:</span>{' '}
+              {backspaces}
             </span>
             <span>
-              <strong>Wrong Keystrokes:</strong> {wrongCount}
+              <span className="font-medium">Wrong Keystrokes:</span>{' '}
+              {wrongCount}
             </span>
             <span>
-              <strong>Peak WPM:</strong> {highestSpeed}
+              <span className="font-medium">Peak WPM:</span>{' '}
+              {highestSpeed}
             </span>
           </div>
-          {!finished && (
+          {finished === false && (
             <button
               onClick={endTest}
               className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
