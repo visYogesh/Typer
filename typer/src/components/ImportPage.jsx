@@ -16,7 +16,7 @@ export default function ImportPage() {
 
     try {
       // Send the text and selected time to the backend
-      const res = await fetch(`https://typerbackend-qnjq.onrender.com/api/text`, {
+      const res = await fetch(`https://typerbacker11.onrender.com/api/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text })
